@@ -1,0 +1,60 @@
+#cloud-config
+# hacklab cloud-init. Renders into the server's user_data at apply time.
+# It only sets up identity (user, sudo, SSH) and then runs the big
+# provisioning script, which logs to /var/log/hacklab-setup.log.
+
+hostname: ${server_name}
+preserve_hostname: false
+manage_etc_hosts: true
+
+# We run apt-get update ourselves inside the setup script.
+package_update: false
+package_upgrade: false
+
+# SSH password auth is disabled (see the sshd drop-in below).
+ssh_pwauth: false
+
+users:
+  - name: ${username}
+    gecos: hacklab user
+    shell: /bin/bash
+    groups: [sudo, adm]
+    # Password is for the Hetzner web console / rescue mode only.
+    lock_passwd: false
+    # Quoted: the bcrypt hash contains $ and / characters.
+    hashed_passwd: "${password_hash}"
+    ssh_authorized_keys:
+      - "${ssh_public_key}"
+
+write_files:
+  # Passwordless sudo. Validated with visudo by the setup script.
+  - path: /etc/sudoers.d/90-hacklab
+    owner: root:root
+    permissions: '0440'
+    content: |
+      ${username} ALL=(ALL) NOPASSWD:ALL
+
+  # SSH hardening, pinned as a drop-in so it survives cloud-init's own sshd changes.
+  # Prefixed 00- on purpose: sshd uses the FIRST value it obtains and sshd_config.d
+  # is Included from the top of sshd_config, so 00-* wins over cloud-init's
+  # 50-cloud-init.conf (which may set PasswordAuthentication yes).
+  - path: /etc/ssh/sshd_config.d/00-hacklab.conf
+    owner: root:root
+    permissions: '0644'
+    content: |
+      # hacklab hardening (must sort first among sshd_config.d/*.conf)
+      PubkeyAuthentication yes
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      PermitRootLogin no
+      PermitEmptyPasswords no
+
+  # The provisioning script (rendered from cloud-init/setup.sh).
+  - path: /usr/local/sbin/hacklab-setup.sh
+    owner: root:root
+    permissions: '0755'
+    content: |
+      ${setup_script}
+
+runcmd:
+  - [ bash, -lc, 'install -d -m 0755 /var/lib/hacklab && HACKLAB_USER="${username}" HACKLAB_GHIDRA_VERSION="${ghidra_version}" HACKLAB_GHIDRA_SHA256="${ghidra_sha256}" HACKLAB_JDK_PKG="${jdk_package}" /usr/local/sbin/hacklab-setup.sh' ]

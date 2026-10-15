@@ -1,0 +1,32 @@
+# OpenTofu / Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
+# NOTE: .terraform.lock.hcl is intentionally NOT ignored — commit it so everyone
+# resolves the exact same provider versions.
+
+# Real variable files may contain secrets (e.g. cidrs). Only the example is committed.
+*.tfvars
+*.tfvars.json
+!terraform.tfvars.example
+
+# CLI override files
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Local secrets / scratch
+*.pem
+*.key
+.env
+.envrc
+
+# Editor / OS cruft
+.idea/
+.vscode/
+*.swp
+.DS_Store
